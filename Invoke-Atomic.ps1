@@ -22,7 +22,7 @@ Optional: Local Path To The atomics folder
 Generate command line output for each test described.
 Invoke-AtomicRedTeam -GenerateTestPlan
 .EXAMPLE
-	. C:\Users\subTee\Downloads\atomic-red-team-master\execution-frameworks\Invoke-AtomicRedTeamRevised.ps1
+	. C:\Users\subTee\Downloads\atomic-red-team-master\execution-frameworks\Invoke-Atomic.ps1
 	[System.Collections.HashTable]$AllAtomicTests = @{};
 	$AtomicFilePath = 'C:\Users\subtee\downloads\atomic-red-team-fixed\atomics\';
 	Get-Childitem $AtomicFilePath -Recurse -Filter *.yaml -File | ForEach-Object {
