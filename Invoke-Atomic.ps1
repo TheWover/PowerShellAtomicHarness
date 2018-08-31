@@ -24,7 +24,7 @@ Invoke-AtomicRedTeam -GenerateTestPlan
 .EXAMPLE
 	. C:\Users\subTee\Downloads\atomic-red-team-master\execution-frameworks\Invoke-Atomic.ps1
 	[System.Collections.HashTable]$AllAtomicTests = @{};
-	$AtomicFilePath = 'C:\Users\subtee\downloads\atomic-red-team-fixed\atomics\';
+	$AtomicFilePath = 'C:\Users\subtee\downloads\atomic-red-team\atomics\';
 	Get-Childitem $AtomicFilePath -Recurse -Filter *.yaml -File | ForEach-Object {
 	$currentTechnique = [System.IO.Path]::GetFileNameWithoutExtension($_.FullName);
 	$parsedYaml = (ConvertFrom-Yaml (Get-Content $_.FullName -Raw ));
