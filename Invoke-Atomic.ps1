@@ -1,7 +1,3 @@
-<# 
-	
-	
-#>
 <#
 .SYNOPSIS
 This script will iterate over the Atomic Red Team yaml files, create objects for each test. 
