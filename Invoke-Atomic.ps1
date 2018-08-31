@@ -1,13 +1,13 @@
 <#
 .SYNOPSIS
 This script will iterate over the Atomic Red Team yaml files, create objects for each test. 
-The aim is to allow defedenders to excercise MITRE ATT&CK Techniques to test defenses.
+The aim is to allow defenders to excercise MITRE ATT&CK Techniques to test defenses.
 
 
 Function: Invoke-AtomicRedTeam
 Author: Casey Smith @subTee
 License:  http://opensource.org/licenses/MIT
-Required Dependencies: powershell-yaml , Install-Module powershell-yaml https://github.com/cloudbase/powershell-yaml
+Required Dependencies: powershell-yaml , Install-Module powershell-yaml #https://github.com/cloudbase/powershell-yaml
 Optional Dependencies: None
 Version: 1.0
 
